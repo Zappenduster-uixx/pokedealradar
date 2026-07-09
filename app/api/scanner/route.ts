@@ -13,6 +13,21 @@ type ScannerDeal = {
   description: string;
 };
 
+type ScannerResult = {
+  source: string;
+  deals: ScannerDeal[];
+  error?: string;
+};
+
+type RetailerScannerConfig = {
+  source: string;
+  retailer: string;
+  url: string;
+  baseUrl: string;
+  validUntil: string;
+  description: string;
+};
+
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1613771404721-1f92d799e49f?q=80&w=1200&auto=format&fit=crop";
 
@@ -30,6 +45,13 @@ function cleanText(value: string) {
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'")
     .replace(/&nbsp;/g, " ")
+    .replace(/&auml;/g, "ä")
+    .replace(/&ouml;/g, "ö")
+    .replace(/&uuml;/g, "ü")
+    .replace(/&Auml;/g, "Ä")
+    .replace(/&Ouml;/g, "Ö")
+    .replace(/&Uuml;/g, "Ü")
+    .replace(/&szlig;/g, "ß")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -54,7 +76,8 @@ function guessCategory(text: string) {
   if (
     lower.includes("kollektion") ||
     lower.includes("collection") ||
-    lower.includes("box")
+    lower.includes("box") ||
+    lower.includes("bundle")
   ) {
     return "Kollektion";
   }
@@ -66,6 +89,7 @@ function extractPrice(text: string) {
   const normalized = text.replace(/\s+/g, " ");
 
   const pricePatterns = [
+    /\d{1,4}\s?[,.]\s?\d{2}\s?€/,
     /\d{1,4}[,.]\d{2}\s?€/,
     /\d{1,4}\s?€/,
     /€\s?\d{1,4}[,.]\d{2}/,
@@ -75,11 +99,15 @@ function extractPrice(text: string) {
     const match = normalized.match(pattern);
 
     if (match) {
-      return match[0].replace(".", ",").trim();
+      return match[0]
+        .replace(/\s?,\s?/g, ",")
+        .replace(/\s?\.\s?/g, ",")
+        .replace(/\s+/g, " ")
+        .trim();
     }
   }
 
-  return "Preis auf MyDealz prüfen";
+  return "Preis prüfen";
 }
 
 function detectRetailer(text: string) {
@@ -91,16 +119,17 @@ function detectRetailer(text: string) {
     { name: "Amazon", keywords: ["amazon"] },
     { name: "MediaMarkt", keywords: ["mediamarkt", "media markt"] },
     { name: "Saturn", keywords: ["saturn"] },
+    { name: "Rossmann", keywords: ["rossmann"] },
+    { name: "Netto", keywords: ["netto"] },
+    { name: "Kaufland", keywords: ["kaufland"] },
+    { name: "REWE", keywords: ["rewe"] },
+    { name: "Lidl", keywords: ["lidl"] },
+    { name: "Aldi", keywords: ["aldi"] },
     { name: "GameStop", keywords: ["gamestop", "game stop"] },
     { name: "eBay", keywords: ["ebay"] },
     { name: "Cardmarket", keywords: ["cardmarket"] },
     { name: "Thalia", keywords: ["thalia"] },
-    { name: "Rossmann", keywords: ["rossmann"] },
     { name: "dm", keywords: ["dm-drogerie", "dm drogerie", "dm.de"] },
-    { name: "Lidl", keywords: ["lidl"] },
-    { name: "Aldi", keywords: ["aldi"] },
-    { name: "Kaufland", keywords: ["kaufland"] },
-    { name: "REWE", keywords: ["rewe"] },
     { name: "Marktkauf", keywords: ["marktkauf"] },
     { name: "Galeria", keywords: ["galeria"] },
     { name: "Otto", keywords: ["otto.de", " otto "] },
@@ -144,10 +173,49 @@ function detectRetailer(text: string) {
   return "MyDealz";
 }
 
-function isPokemonCardDeal(text: string) {
+function hasPokemonWord(text: string) {
   const lower = text.toLowerCase();
 
-  const hasPokemon = lower.includes("pokemon") || lower.includes("pokémon");
+  return (
+    lower.includes("pokemon") ||
+    lower.includes("pokémon") ||
+    lower.includes("pokmon")
+  );
+}
+
+function hasForbiddenCardBrand(text: string) {
+  const lower = text.toLowerCase();
+
+  const forbiddenWords = [
+    "yu-gi-oh",
+    "yugioh",
+    "yu gi oh",
+    "one piece",
+    "onepiece",
+    "lorcana",
+    "magic the gathering",
+    "mtg",
+    "digimon",
+    "dragon ball",
+    "dragonball",
+    "star wars unlimited",
+    "union arena",
+    "weiss schwarz",
+    "weiss schwarz",
+    "final fantasy",
+    "flesh and blood",
+    "altered tcg",
+    "panini",
+    "topps",
+    "match attax",
+    "adrenalyn",
+  ];
+
+  return forbiddenWords.some((word) => lower.includes(word));
+}
+
+function hasCardWord(text: string) {
+  const lower = text.toLowerCase();
 
   const cardWords = [
     "karten",
@@ -165,7 +233,17 @@ function isPokemonCardDeal(text: string) {
     "collection",
     "bundle",
     "box",
+    "blister",
+    "sammelkoffer",
+    "kampfdeck",
+    "ex",
   ];
+
+  return cardWords.some((word) => lower.includes(word));
+}
+
+function isPokemonCardDeal(text: string) {
+  const lower = text.toLowerCase();
 
   const excludeWords = [
     "switch",
@@ -179,23 +257,46 @@ function isPokemonCardDeal(text: string) {
     "poster",
     "shirt",
     "socken",
+    "puzzle",
+    "monopoly",
+    "dvd",
+    "blu-ray",
+    "spielzeugfigur",
+    "bauset",
+    "kuscheltier",
   ];
 
-  const hasCardWord = cardWords.some((word) => lower.includes(word));
   const hasExcludedWord = excludeWords.some((word) => lower.includes(word));
 
-  return hasPokemon && hasCardWord && !hasExcludedWord;
+  return (
+    hasPokemonWord(text) &&
+    hasCardWord(text) &&
+    !hasForbiddenCardBrand(text) &&
+    !hasExcludedWord
+  );
 }
 
-function normalizeMyDealzUrl(href: string) {
+function normalizeUrl(href: string, baseUrl: string) {
   if (href.startsWith("http")) {
     return href.split("?")[0];
   }
 
-  return `https://www.mydealz.de${href}`.split("?")[0];
+  if (href.startsWith("//")) {
+    return `https:${href}`.split("?")[0];
+  }
+
+  if (href.startsWith("/")) {
+    return `${baseUrl}${href}`.split("?")[0];
+  }
+
+  return `${baseUrl}/${href}`.split("?")[0];
 }
 
-function normalizeImageUrl(url: string) {
+function normalizeMyDealzUrl(href: string) {
+  return normalizeUrl(href, "https://www.mydealz.de");
+}
+
+function normalizeImageUrl(url: string, baseUrl: string) {
   if (!url) return FALLBACK_IMAGE;
 
   const cleanedUrl = url
@@ -212,13 +313,13 @@ function normalizeImageUrl(url: string) {
   }
 
   if (cleanedUrl.startsWith("/")) {
-    return `https://www.mydealz.de${cleanedUrl}`;
+    return `${baseUrl}${cleanedUrl}`;
   }
 
   return FALLBACK_IMAGE;
 }
 
-function extractImageFromArticle(articleHtml: string) {
+function extractImageFromArticle(articleHtml: string, baseUrl: string) {
   const srcSetMatch =
     articleHtml.match(/<source[^>]+srcset="([^"]+)"/i) ||
     articleHtml.match(/<img[^>]+srcset="([^"]+)"/i);
@@ -227,23 +328,42 @@ function extractImageFromArticle(articleHtml: string) {
     const firstSrcSetUrl = srcSetMatch[1].split(",")[0]?.trim().split(" ")[0];
 
     if (firstSrcSetUrl) {
-      return normalizeImageUrl(firstSrcSetUrl);
+      return normalizeImageUrl(firstSrcSetUrl, baseUrl);
     }
   }
 
   const imageMatch =
     articleHtml.match(/<img[^>]+data-src="([^"]+)"/i) ||
     articleHtml.match(/<img[^>]+data-lazy-src="([^"]+)"/i) ||
-    articleHtml.match(/<img[^>]+src="([^"]+)"/i);
+    articleHtml.match(/<img[^>]+src="([^"]+)"/i) ||
+    articleHtml.match(/"image"\s*:\s*"([^"]+)"/i);
 
   if (imageMatch?.[1]) {
-    return normalizeImageUrl(imageMatch[1]);
+    return normalizeImageUrl(imageMatch[1], baseUrl);
   }
 
   return FALLBACK_IMAGE;
 }
 
-function extractDealsFromHtml(html: string): ScannerDeal[] {
+async function fetchHtml(url: string) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; PokedealradarBot/0.1; +https://pokedealradar.vercel.app)",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Status: ${response.status}`);
+  }
+
+  return response.text();
+}
+
+function extractMyDealzDealsFromHtml(html: string): ScannerDeal[] {
   const deals: ScannerDeal[] = [];
 
   const articleRegex = /<article[\s\S]*?<\/article>/gi;
@@ -281,7 +401,8 @@ function extractDealsFromHtml(html: string): ScannerDeal[] {
       title = titleMatch ? cleanText(titleMatch[1]) : articleText.slice(0, 120);
     }
 
-    if (!title || !isPokemonCardDeal(`${title} ${articleText}`)) continue;
+    if (!title) continue;
+    if (!isPokemonCardDeal(`${title} ${articleText}`)) continue;
 
     deals.push({
       title,
@@ -291,7 +412,7 @@ function extractDealsFromHtml(html: string): ScannerDeal[] {
       category: guessCategory(articleText),
       deal_type: "Online",
       valid_until: "MyDealz-Fund",
-      image: extractImageFromArticle(articleHtml),
+      image: extractImageFromArticle(articleHtml, "https://www.mydealz.de"),
       description:
         "Automatisch gefundener Pokémon-Karten-Deal aus der MyDealz-Pokémon-Gruppe. Bitte Preis, Händler und Verfügbarkeit auf MyDealz prüfen.",
     });
@@ -300,41 +421,287 @@ function extractDealsFromHtml(html: string): ScannerDeal[] {
   return deals.slice(0, 10);
 }
 
+function makeNiceTitleFromUrl(href: string) {
+  const withoutQuery = href.split("?")[0];
+
+  const urlPart =
+    withoutQuery
+      .split("/p/")[0]
+      .split("/")
+      .filter(Boolean)
+      .pop() || "";
+
+  if (!urlPart) return "";
+
+  return decodeURIComponent(urlPart)
+    .replace(/-/g, " ")
+    .replace(/\bpokemon\b/gi, "Pokémon")
+    .replace(/\bpokémon\b/gi, "Pokémon")
+    .replace(/\bkarten\b/gi, "Karten")
+    .replace(/\bsammelkartenspiel\b/gi, "Sammelkartenspiel")
+    .replace(/\btcg\b/gi, "TCG")
+    .replace(/\bex\b/gi, "ex")
+    .replace(/\bund\b/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isStrictRetailerPokemonTitle(title: string, href: string) {
+  const combined = `${title} ${href}`;
+
+  if (!hasPokemonWord(combined)) return false;
+  if (hasForbiddenCardBrand(combined)) return false;
+
+  return true;
+}
+
+function extractRetailerDealsFromHtml(
+  html: string,
+  config: RetailerScannerConfig,
+): ScannerDeal[] {
+  const deals: ScannerDeal[] = [];
+
+  const linkRegex = /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  const linkMatches = Array.from(html.matchAll(linkRegex));
+
+  for (const linkMatch of linkMatches) {
+    const href = linkMatch[1];
+
+    if (!href) continue;
+
+    const hrefLower = href.toLowerCase();
+
+    const looksLikeProductUrl =
+      hrefLower.includes("pokemon") ||
+      hrefLower.includes("pok%C3%A9mon".toLowerCase()) ||
+      hrefLower.includes("pok%C3%A9") ||
+      hrefLower.includes("/p/") ||
+      hrefLower.includes("/product/") ||
+      hrefLower.includes("sammelkarten");
+
+    if (!looksLikeProductUrl) continue;
+
+    const sourceUrl = normalizeUrl(href, config.baseUrl);
+
+    if (deals.some((deal) => deal.source_url === sourceUrl)) continue;
+
+    const matchIndex = linkMatch.index ?? html.indexOf(linkMatch[0]);
+
+    const surroundingHtml =
+      matchIndex >= 0
+        ? html.slice(
+            Math.max(0, matchIndex - 3000),
+            Math.min(html.length, matchIndex + 6000),
+          )
+        : linkMatch[0];
+
+    const linkText = cleanText(linkMatch[2]);
+    const surroundingText = cleanText(surroundingHtml);
+
+    const titleMatch =
+      surroundingHtml.match(/title="([^"]*Pok[^"]+)"/i) ||
+      surroundingHtml.match(/alt="([^"]*Pok[^"]+)"/i) ||
+      surroundingHtml.match(/aria-label="([^"]*Pok[^"]+)"/i) ||
+      surroundingHtml.match(/"name"\s*:\s*"([^"]*Pok[^"]+)"/i);
+
+    let title = titleMatch?.[1]
+      ? cleanText(titleMatch[1])
+      : linkText.length >= 10
+        ? linkText
+        : makeNiceTitleFromUrl(href);
+
+    title = title
+      .replace(/\bpokemon\b/gi, "Pokémon")
+      .replace(/\bkarten\b/gi, "Karten")
+      .replace(/\btcg\b/gi, "TCG")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!title || title.length < 8) continue;
+
+    /*
+      Wichtig:
+      Bei Händlerseiten prüfen wir jetzt streng nur Titel + URL.
+      Dadurch werden Yu-Gi-Oh, One Piece, Lorcana usw. nicht mehr durchgelassen,
+      nur weil irgendwo auf der Sammelkarten-Seite auch Pokémon vorkommt.
+    */
+    if (!isStrictRetailerPokemonTitle(title, href)) continue;
+
+    /*
+      Danach prüfen wir zusätzlich, ob Titel oder Umfeld wie ein Kartenprodukt aussieht.
+      Aber Pokémon muss weiterhin im Titel oder Link stehen.
+    */
+    if (!hasCardWord(`${title} ${href} ${surroundingText}`)) continue;
+
+    deals.push({
+      title: title.length > 180 ? `${title.slice(0, 177)}...` : title,
+      source_url: sourceUrl,
+      retailer: config.retailer,
+      price: extractPrice(surroundingText),
+      category: guessCategory(`${title} ${surroundingText}`),
+      deal_type: "Online",
+      valid_until: config.validUntil,
+      image: extractImageFromArticle(surroundingHtml, config.baseUrl),
+      description: config.description,
+    });
+  }
+
+  return deals.slice(0, 10);
+}
+
+async function scanMyDealz(): Promise<ScannerResult> {
+  try {
+    const html = await fetchHtml("https://www.mydealz.de/gruppe/pokemon");
+    const deals = extractMyDealzDealsFromHtml(html);
+
+    return {
+      source: "MyDealz",
+      deals,
+    };
+  } catch (error) {
+    return {
+      source: "MyDealz",
+      deals: [],
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+async function scanRetailer(
+  config: RetailerScannerConfig,
+): Promise<ScannerResult> {
+  try {
+    const html = await fetchHtml(config.url);
+    const deals = extractRetailerDealsFromHtml(html, config);
+
+    return {
+      source: config.source,
+      deals,
+    };
+  } catch (error) {
+    return {
+      source: config.source,
+      deals: [],
+      error: error instanceof Error ? error.message : "Unbekannter Fehler",
+    };
+  }
+}
+
+const retailerScanners: RetailerScannerConfig[] = [
+  {
+    source: "Müller",
+    retailer: "Müller",
+    url: "https://www.mueller.de/c/spielwaren/spiele-puzzles/spiele/sammelkarten/pokemon/",
+    baseUrl: "https://www.mueller.de",
+    validUntil: "Müller-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Müller. Bitte Preis und Verfügbarkeit direkt bei Müller prüfen.",
+  },
+  {
+    source: "MediaMarkt",
+    retailer: "MediaMarkt",
+    url: "https://www.mediamarkt.de/de/search.html?query=pokemon%20karten",
+    baseUrl: "https://www.mediamarkt.de",
+    validUntil: "MediaMarkt-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von MediaMarkt. Bitte Preis und Verfügbarkeit direkt bei MediaMarkt prüfen.",
+  },
+  {
+    source: "Rossmann",
+    retailer: "Rossmann",
+    url: "https://www.rossmann.de/de/search/?text=pokemon%20karten",
+    baseUrl: "https://www.rossmann.de",
+    validUntil: "Rossmann-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Rossmann. Bitte Preis und Verfügbarkeit direkt bei Rossmann prüfen.",
+  },
+  {
+    source: "Netto",
+    retailer: "Netto",
+    url: "https://www.netto-online.de/suche?text=pokemon%20karten",
+    baseUrl: "https://www.netto-online.de",
+    validUntil: "Netto-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Netto. Bitte Preis und Verfügbarkeit direkt bei Netto prüfen.",
+  },
+  {
+    source: "Kaufland",
+    retailer: "Kaufland",
+    url: "https://www.kaufland.de/s/?search_value=pokemon%20karten",
+    baseUrl: "https://www.kaufland.de",
+    validUntil: "Kaufland-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Kaufland. Bitte Preis, Verkäufer und Verfügbarkeit direkt bei Kaufland prüfen.",
+  },
+  {
+    source: "REWE",
+    retailer: "REWE",
+    url: "https://www.rewe.de/suche/produkte?search=pokemon%20karten",
+    baseUrl: "https://www.rewe.de",
+    validUntil: "REWE-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von REWE. Bitte Preis und Verfügbarkeit direkt bei REWE prüfen.",
+  },
+  {
+    source: "Lidl",
+    retailer: "Lidl",
+    url: "https://www.lidl.de/q/search?q=pokemon%20karten",
+    baseUrl: "https://www.lidl.de",
+    validUntil: "Lidl-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Lidl. Bitte Preis und Verfügbarkeit direkt bei Lidl prüfen.",
+  },
+  {
+    source: "Aldi",
+    retailer: "Aldi",
+    url: "https://www.aldi-onlineshop.de/suche?text=pokemon%20karten",
+    baseUrl: "https://www.aldi-onlineshop.de",
+    validUntil: "Aldi-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Aldi. Bitte Preis und Verfügbarkeit direkt bei Aldi prüfen.",
+  },
+];
+
 export async function POST(request: Request) {
   if (!isAllowed(request)) {
     return NextResponse.json({ error: "Nicht erlaubt." }, { status: 401 });
   }
 
-  const searchUrl = "https://www.mydealz.de/gruppe/pokemon";
+  const scannerResults = await Promise.all([
+    scanMyDealz(),
+    ...retailerScanners.map((scanner) => scanRetailer(scanner)),
+  ]);
 
-  const response = await fetch(searchUrl, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; PokedealradarBot/0.1; +https://pokedealradar.vercel.app)",
-      Accept: "text/html",
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    return NextResponse.json(
-      {
-        error: `MyDealz konnte nicht geladen werden. Status: ${response.status}`,
-      },
-      { status: 500 },
-    );
-  }
-
-  const html = await response.text();
-  const foundDeals = extractDealsFromHtml(html);
+  const foundDeals = scannerResults.flatMap((result) => result.deals);
 
   if (foundDeals.length === 0) {
+    const errorMessages = scannerResults
+      .filter((result) => result.error)
+      .map((result) => `${result.source}: ${result.error}`)
+      .join(" | ");
+
+    const sourceSummary = scannerResults
+      .map((result) => {
+        if (result.error) {
+          return `${result.source}: Fehler ${result.error}`;
+        }
+
+        return `${result.source}: ${result.deals.length} gefunden`;
+      })
+      .join(" | ");
+
     return NextResponse.json({
       success: true,
       inserted: 0,
       skipped: 0,
-      message:
-        "Scanner lief durch, aber es wurden keine passenden Pokémon-Karten-Deals gefunden.",
+      message: errorMessages
+        ? `Scanner lief durch, aber es wurden keine Deals gefunden. Fehler: ${errorMessages}. ${sourceSummary}`
+        : `Scanner lief durch, aber es wurden keine passenden Pokémon-Karten-Deals gefunden. ${sourceSummary}`,
+      sources: scannerResults.map((result) => ({
+        source: result.source,
+        found: result.deals.length,
+        error: result.error ?? null,
+      })),
     });
   }
 
@@ -382,10 +749,25 @@ export async function POST(request: Request) {
     inserted++;
   }
 
+  const sourceSummary = scannerResults
+    .map((result) => {
+      if (result.error) {
+        return `${result.source}: Fehler ${result.error}`;
+      }
+
+      return `${result.source}: ${result.deals.length} gefunden`;
+    })
+    .join(" | ");
+
   return NextResponse.json({
     success: true,
     inserted,
     skipped,
-    message: `Scanner fertig. ${inserted} neue Deals gespeichert, ${skipped} übersprungen.`,
+    message: `Scanner fertig. ${inserted} neue Deals gespeichert, ${skipped} übersprungen. ${sourceSummary}`,
+    sources: scannerResults.map((result) => ({
+      source: result.source,
+      found: result.deals.length,
+      error: result.error ?? null,
+    })),
   });
 }
