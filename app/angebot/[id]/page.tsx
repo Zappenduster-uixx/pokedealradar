@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 
 type Offer = {
@@ -18,33 +19,37 @@ type Offer = {
   description: string;
 };
 
-type OfferDetailPageProps = {
-  params: {
-    id: string;
-  };
-};
+export default function OfferDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
 
-export default function OfferDetailPage({ params }: OfferDetailPageProps) {
   const [offer, setOffer] = useState<Offer | null | undefined>(undefined);
 
   useEffect(() => {
     async function loadOffer() {
+      const offerId = Number(id);
+
+      if (!offerId || Number.isNaN(offerId)) {
+        setOffer(null);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("offers")
         .select("*")
-        .eq("id", Number(params.id))
-        .single();
+        .eq("id", offerId)
+        .maybeSingle();
 
       if (error) {
         console.error("Fehler beim Laden:", error.message);
         setOffer(null);
       } else {
-        setOffer(data);
+        setOffer(data ?? null);
       }
     }
 
     loadOffer();
-  }, [params.id]);
+  }, [id]);
 
   if (offer === undefined) {
     return (
@@ -149,7 +154,7 @@ export default function OfferDetailPage({ params }: OfferDetailPageProps) {
               rel="noopener noreferrer"
               className="mt-8 inline-flex w-full items-center justify-center rounded-2xl bg-yellow-400 px-5 py-4 text-lg font-black text-zinc-950 hover:bg-yellow-300"
             >
-              Zum Angebot beim Händler
+              Zum Angebot / zur Quelle
             </a>
           </div>
         </div>
