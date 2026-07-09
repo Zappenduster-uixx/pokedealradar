@@ -155,6 +155,27 @@ export default function AdminPage() {
     }
   }
 
+  async function runScanner() {
+    setMessage("Scanner läuft...");
+
+    const response = await fetch("/api/scanner", {
+      method: "POST",
+      headers: {
+        "x-admin-pin": pinInput || process.env.NEXT_PUBLIC_ADMIN_PIN || "",
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setMessage(`Scanner-Fehler: ${result.error}`);
+      return;
+    }
+
+    setMessage(result.message || "Scanner wurde ausgeführt.");
+    loadOffers();
+  }
+
   function startEditing(offer: Offer) {
     setEditingOfferId(offer.id);
     setForm({
@@ -240,12 +261,19 @@ export default function AdminPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-zinc-400">
-              Trage neue Pokémon-Karten-Angebote ein oder bearbeite bestehende
-              Einträge.
+              Trage neue Pokémon-Karten-Angebote ein, bearbeite bestehende
+              Einträge oder starte den Scanner.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={runScanner}
+              className="inline-flex items-center justify-center rounded-2xl border border-yellow-400 px-5 py-3 font-bold text-yellow-400 hover:bg-yellow-400 hover:text-zinc-950"
+            >
+              Scanner starten
+            </button>
+
             <Link
               href="/"
               className="inline-flex items-center justify-center rounded-2xl border border-zinc-700 px-5 py-3 font-bold text-zinc-200 hover:border-yellow-400 hover:text-yellow-400"
