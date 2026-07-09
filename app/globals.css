@@ -1,26 +1,266 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #08090b;
+  --background-2: #0d0f14;
+  --surface: rgba(18, 20, 26, 0.92);
+  --surface-strong: rgba(25, 28, 36, 0.98);
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #f9fafb;
+  --muted: #a1a1aa;
+  --gold: #ffcb05;
+  --gold-dark: #e6b800;
+  --blue: #2a75bb;
+  --blue-dark: #184c86;
+  --danger: #ef4444;
+  --success: #22c55e;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(42, 117, 187, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(255, 203, 5, 0.16), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(255, 203, 5, 0.08), transparent 20%),
+    linear-gradient(180deg, var(--background) 0%, var(--background-2) 100%);
+}
+
+h1,
+h2,
+h3,
+.font-poke {
+  font-family: var(--font-poke), cursive;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.poke-title {
+  color: var(--gold);
+  text-shadow:
+    0 3px 0 var(--blue),
+    0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.poke-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--border);
+  background: linear-gradient(
+    180deg,
+    rgba(24, 27, 35, 0.95) 0%,
+    rgba(14, 16, 21, 0.95) 100%
+  );
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.poke-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(255, 203, 5, 0.08), transparent 35%),
+    radial-gradient(circle at top right, rgba(42, 117, 187, 0.12), transparent 30%);
+}
+
+.poke-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.poke-badge-gold {
+  background: linear-gradient(180deg, #ffd84c 0%, #ffcb05 100%);
+  color: #171717;
+}
+
+.poke-badge-dark {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 12, 0.7);
+  color: #e5e7eb;
+}
+
+.poke-input,
+.poke-select,
+.poke-textarea {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 8, 11, 0.92);
+  color: white;
+  padding: 0.9rem 1rem;
+  outline: none;
+  transition: all 0.18s ease;
+}
+
+.poke-input::placeholder,
+.poke-textarea::placeholder {
+  color: #71717a;
+}
+
+.poke-input:focus,
+.poke-select:focus,
+.poke-textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.16);
+}
+
+.poke-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 18px;
+  font-weight: 800;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.poke-button-primary {
+  background: linear-gradient(180deg, #ffd84c 0%, #ffcb05 100%);
+  color: #111111;
+  border: 1px solid rgba(255, 203, 5, 0.8);
+  box-shadow:
+    0 10px 24px rgba(255, 203, 5, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.poke-button-primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.poke-button-secondary {
+  background: rgba(15, 17, 22, 0.88);
+  color: #f5f5f5;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.poke-button-secondary:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.poke-button-danger {
+  background: rgba(60, 11, 11, 0.35);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.poke-button-danger:hover {
+  background: rgba(90, 20, 20, 0.45);
+  transform: translateY(-1px);
+}
+
+.poke-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(255, 203, 5, 0.18), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(42, 117, 187, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(20, 22, 29, 0.96) 0%, rgba(10, 11, 15, 0.96) 100%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+}
+
+.poke-hero::before,
+.poke-hero::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.poke-hero::before {
+  width: 220px;
+  height: 220px;
+  top: -70px;
+  right: -40px;
+  background: radial-gradient(circle, rgba(255, 203, 5, 0.22), transparent 70%);
+}
+
+.poke-hero::after {
+  width: 260px;
+  height: 260px;
+  bottom: -120px;
+  left: -80px;
+  background: radial-gradient(circle, rgba(42, 117, 187, 0.16), transparent 70%);
+}
+
+.poke-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(19, 21, 28, 0.98) 0%,
+    rgba(11, 12, 17, 0.98) 100%
+  );
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.poke-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 203, 5, 0.7);
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 203, 5, 0.15);
+}
+
+.poke-card-image {
+  height: 220px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.poke-card-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.35) 100%);
+}
+
+.poke-price {
+  color: var(--gold);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 2px 12px rgba(255, 203, 5, 0.08);
+}
+
+.poke-divider {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 20%,
+    rgba(255, 255, 255, 0.08) 80%,
+    transparent 100%
+  );
 }
