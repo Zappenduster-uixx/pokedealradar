@@ -82,6 +82,68 @@ function extractPrice(text: string) {
   return "Preis auf MyDealz prüfen";
 }
 
+function detectRetailer(text: string) {
+  const lower = text.toLowerCase();
+
+  const retailers = [
+    { name: "Smyths Toys", keywords: ["smyths", "smythstoys"] },
+    { name: "Müller", keywords: ["müller", "mueller"] },
+    { name: "Amazon", keywords: ["amazon"] },
+    { name: "MediaMarkt", keywords: ["mediamarkt", "media markt"] },
+    { name: "Saturn", keywords: ["saturn"] },
+    { name: "GameStop", keywords: ["gamestop", "game stop"] },
+    { name: "eBay", keywords: ["ebay"] },
+    { name: "Cardmarket", keywords: ["cardmarket"] },
+    { name: "Thalia", keywords: ["thalia"] },
+    { name: "Rossmann", keywords: ["rossmann"] },
+    { name: "dm", keywords: ["dm-drogerie", "dm drogerie", "dm.de"] },
+    { name: "Lidl", keywords: ["lidl"] },
+    { name: "Aldi", keywords: ["aldi"] },
+    { name: "Kaufland", keywords: ["kaufland"] },
+    { name: "REWE", keywords: ["rewe"] },
+    { name: "Marktkauf", keywords: ["marktkauf"] },
+    { name: "Galeria", keywords: ["galeria"] },
+    { name: "Otto", keywords: ["otto.de", " otto "] },
+    { name: "Alternate", keywords: ["alternate"] },
+    { name: "Coolshop", keywords: ["coolshop"] },
+    { name: "Alza", keywords: ["alza"] },
+    { name: "Proshop", keywords: ["proshop"] },
+    { name: "Toynova", keywords: ["toynova"] },
+    { name: "FantasyWelt", keywords: ["fantasywelt", "fantasy welt"] },
+    { name: "Elbenwald", keywords: ["elbenwald"] },
+    { name: "Manga-Mafia", keywords: ["manga-mafia", "manga mafia"] },
+    { name: "Gate to the Games", keywords: ["gate to the games", "gttg"] },
+    { name: "World of Games", keywords: ["world of games", "wog.ch"] },
+    { name: "Pokémon Center", keywords: ["pokemon center", "pokémon center"] },
+  ];
+
+  const foundRetailer = retailers.find((retailer) =>
+    retailer.keywords.some((keyword) => lower.includes(keyword)),
+  );
+
+  if (foundRetailer) {
+    return foundRetailer.name;
+  }
+
+  const beiMatch = text.match(/\bbei\s+([A-ZÄÖÜa-zäöüß0-9 .&-]{2,40})/);
+
+  if (beiMatch?.[1]) {
+    const possibleRetailer = beiMatch[1]
+      .split(" für ")[0]
+      .split(" ab ")[0]
+      .split(" mit ")[0]
+      .split(" - ")[0]
+      .split("|")[0]
+      .trim();
+
+    if (possibleRetailer.length >= 2 && possibleRetailer.length <= 40) {
+      return possibleRetailer;
+    }
+  }
+
+  return "MyDealz";
+}
+
 function isPokemonCardDeal(text: string) {
   const lower = text.toLowerCase();
 
@@ -224,7 +286,7 @@ function extractDealsFromHtml(html: string): ScannerDeal[] {
     deals.push({
       title,
       source_url: sourceUrl,
-      retailer: "MyDealz",
+      retailer: detectRetailer(`${title} ${articleText}`),
       price: extractPrice(articleText),
       category: guessCategory(articleText),
       deal_type: "Online",
