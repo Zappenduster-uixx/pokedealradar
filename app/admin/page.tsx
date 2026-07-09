@@ -155,6 +155,45 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteAllOffers() {
+    const confirmed = window.confirm(
+      "Willst du wirklich ALLE Angebote löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const secondConfirmed = window.confirm(
+      "Letzte Sicherheitsfrage: Wirklich alle Angebote endgültig löschen?",
+    );
+
+    if (!secondConfirmed) {
+      return;
+    }
+
+    setMessage("Alle Angebote werden gelöscht...");
+
+    const response = await fetch("/api/offers", {
+      method: "DELETE",
+      headers: {
+        "x-admin-pin": pinInput || process.env.NEXT_PUBLIC_ADMIN_PIN || "",
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setMessage(`Fehler beim Löschen aller Angebote: ${result.error}`);
+      return;
+    }
+
+    setMessage(result.message || "Alle Angebote wurden gelöscht.");
+    setOffers([]);
+    setEditingOfferId(null);
+    setForm(emptyForm);
+  }
+
   async function runScanner() {
     setMessage("Scanner läuft...");
 
@@ -262,7 +301,7 @@ export default function AdminPage() {
 
             <p className="mt-3 max-w-2xl text-zinc-400">
               Trage neue Pokémon-Karten-Angebote ein, bearbeite bestehende
-              Einträge oder starte den Scanner.
+              Einträge, starte den Scanner oder lösche alle Angebote.
             </p>
           </div>
 
@@ -272,6 +311,13 @@ export default function AdminPage() {
               className="inline-flex items-center justify-center rounded-2xl border border-yellow-400 px-5 py-3 font-bold text-yellow-400 hover:bg-yellow-400 hover:text-zinc-950"
             >
               Scanner starten
+            </button>
+
+            <button
+              onClick={deleteAllOffers}
+              className="inline-flex items-center justify-center rounded-2xl border border-red-700 px-5 py-3 font-bold text-red-400 hover:bg-red-950"
+            >
+              Alle Angebote löschen
             </button>
 
             <Link
@@ -481,6 +527,12 @@ export default function AdminPage() {
         <h2 className="mb-4 text-2xl font-black">Gespeicherte Angebote</h2>
 
         <div className="space-y-4">
+          {offers.length === 0 && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-zinc-400">
+              Es sind aktuell keine Angebote gespeichert.
+            </div>
+          )}
+
           {offers.map((offer) => (
             <div
               key={offer.id}

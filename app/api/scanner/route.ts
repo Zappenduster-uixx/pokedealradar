@@ -52,6 +52,9 @@ function cleanText(value: string) {
     .replace(/&Ouml;/g, "Ö")
     .replace(/&Uuml;/g, "Ü")
     .replace(/&szlig;/g, "ß")
+    .replace(/&#034;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&euro;/g, "€")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -76,7 +79,8 @@ function guessCategory(text: string) {
   if (
     lower.includes("kollektion") ||
     lower.includes("collection") ||
-    lower.includes("box") ||
+    lower.includes("premium collection") ||
+    lower.includes("premium-kollektion") ||
     lower.includes("bundle")
   ) {
     return "Kollektion";
@@ -91,8 +95,8 @@ function extractPrice(text: string) {
   const pricePatterns = [
     /\d{1,4}\s?[,.]\s?\d{2}\s?€/,
     /\d{1,4}[,.]\d{2}\s?€/,
-    /\d{1,4}\s?€/,
     /€\s?\d{1,4}[,.]\d{2}/,
+    /\d{1,4}\s?€/,
   ];
 
   for (const pattern of pricePatterns) {
@@ -125,24 +129,18 @@ function detectRetailer(text: string) {
     { name: "REWE", keywords: ["rewe"] },
     { name: "Lidl", keywords: ["lidl"] },
     { name: "Aldi", keywords: ["aldi"] },
+    { name: "Elbenwald", keywords: ["elbenwald"] },
+    { name: "Thalia", keywords: ["thalia"] },
+    { name: "LottiCards", keywords: ["lotticards", "lotti cards"] },
+    { name: "God of Cards", keywords: ["godofcards", "god of cards"] },
+    { name: "Gate to the Games", keywords: ["gate to the games", "gttg"] },
+    { name: "FantasyWelt", keywords: ["fantasywelt", "fantasy welt"] },
+    { name: "Toynova", keywords: ["toynova"] },
+    { name: "Coolshop", keywords: ["coolshop"] },
+    { name: "Otto", keywords: ["otto.de", " otto "] },
     { name: "GameStop", keywords: ["gamestop", "game stop"] },
     { name: "eBay", keywords: ["ebay"] },
     { name: "Cardmarket", keywords: ["cardmarket"] },
-    { name: "Thalia", keywords: ["thalia"] },
-    { name: "dm", keywords: ["dm-drogerie", "dm drogerie", "dm.de"] },
-    { name: "Marktkauf", keywords: ["marktkauf"] },
-    { name: "Galeria", keywords: ["galeria"] },
-    { name: "Otto", keywords: ["otto.de", " otto "] },
-    { name: "Alternate", keywords: ["alternate"] },
-    { name: "Coolshop", keywords: ["coolshop"] },
-    { name: "Alza", keywords: ["alza"] },
-    { name: "Proshop", keywords: ["proshop"] },
-    { name: "Toynova", keywords: ["toynova"] },
-    { name: "FantasyWelt", keywords: ["fantasywelt", "fantasy welt"] },
-    { name: "Elbenwald", keywords: ["elbenwald"] },
-    { name: "Manga-Mafia", keywords: ["manga-mafia", "manga mafia"] },
-    { name: "Gate to the Games", keywords: ["gate to the games", "gttg"] },
-    { name: "World of Games", keywords: ["world of games", "wog.ch"] },
     { name: "Pokémon Center", keywords: ["pokemon center", "pokémon center"] },
   ];
 
@@ -179,7 +177,9 @@ function hasPokemonWord(text: string) {
   return (
     lower.includes("pokemon") ||
     lower.includes("pokémon") ||
-    lower.includes("pokmon")
+    lower.includes("pokmon") ||
+    lower.includes("pok%c3%a9mon") ||
+    lower.includes("pok%C3%A9mon".toLowerCase())
   );
 }
 
@@ -201,7 +201,7 @@ function hasForbiddenCardBrand(text: string) {
     "star wars unlimited",
     "union arena",
     "weiss schwarz",
-    "weiss schwarz",
+    "weiß schwarz",
     "final fantasy",
     "flesh and blood",
     "altered tcg",
@@ -214,65 +214,101 @@ function hasForbiddenCardBrand(text: string) {
   return forbiddenWords.some((word) => lower.includes(word));
 }
 
-function hasCardWord(text: string) {
+function hasForbiddenToyWord(text: string) {
   const lower = text.toLowerCase();
 
-  const cardWords = [
-    "karten",
-    "sammelkarten",
-    "booster",
-    "display",
-    "tcg",
-    "top-trainer",
-    "top trainer",
-    "trainer box",
-    "elite trainer",
-    "etb",
-    "tin",
-    "kollektion",
-    "collection",
-    "bundle",
-    "box",
-    "blister",
-    "sammelkoffer",
-    "kampfdeck",
-    "ex",
-  ];
-
-  return cardWords.some((word) => lower.includes(word));
-}
-
-function isPokemonCardDeal(text: string) {
-  const lower = text.toLowerCase();
-
-  const excludeWords = [
-    "switch",
-    "nintendo",
+  const forbiddenWords = [
+    "lego",
+    "bauset",
+    "bausteine",
+    "mega construx",
+    "mega pokémon",
+    "mega pokemon",
     "plüsch",
     "plush",
+    "kuscheltier",
+    "squishmallow",
     "figur",
+    "figuren",
+    "actionfigur",
+    "spielzeugfigur",
     "funko",
-    "lego",
-    "bettwäsche",
+    "pop!",
     "poster",
+    "bettwäsche",
     "shirt",
+    "t-shirt",
     "socken",
     "puzzle",
     "monopoly",
     "dvd",
     "blu-ray",
-    "spielzeugfigur",
-    "bauset",
-    "kuscheltier",
+    "switch",
+    "nintendo switch",
+    "spiel",
+    "brettspiel",
+    "adventskalender",
+    "stickerbuch",
+    "malbuch",
+    "brotdose",
+    "trinkflasche",
+    "rucksack",
+    "tasche",
+    "lampe",
+    "wecker",
   ];
 
-  const hasExcludedWord = excludeWords.some((word) => lower.includes(word));
+  return forbiddenWords.some((word) => lower.includes(word));
+}
 
+function hasStrictCardWord(text: string) {
+  const lower = text.toLowerCase();
+
+  const strictCardWords = [
+    "pokemon karten",
+    "pokémon karten",
+    "pokemon-karte",
+    "pokémon-karte",
+    "pokemon sammlekarten",
+    "pokemon sammelkarten",
+    "pokémon sammelkarten",
+    "sammelkarten",
+    "sammelkarte",
+    "booster",
+    "boosterpack",
+    "booster pack",
+    "display",
+    "top-trainer",
+    "top trainer",
+    "trainer box",
+    "elite trainer box",
+    "etb",
+    "tcg",
+    "trading card",
+    "trading cards",
+    "blister",
+    "mini tin",
+    "tin-box",
+    "tin box",
+    "kampfdeck",
+    "deck",
+    "starter deck",
+    "premium-kollektion",
+    "premium collection",
+    "kollektion",
+    "collection",
+    "sammelkoffer",
+  ];
+
+  return strictCardWords.some((word) => lower.includes(word));
+}
+
+function isPokemonCardDeal(text: string) {
   return (
     hasPokemonWord(text) &&
-    hasCardWord(text) &&
+    hasStrictCardWord(text) &&
     !hasForbiddenCardBrand(text) &&
-    !hasExcludedWord
+    !hasForbiddenToyWord(text)
   );
 }
 
@@ -301,6 +337,7 @@ function normalizeImageUrl(url: string, baseUrl: string) {
 
   const cleanedUrl = url
     .replace(/&amp;/g, "&")
+    .replace(/\\\//g, "/")
     .trim()
     .split(" ")[0];
 
@@ -336,7 +373,9 @@ function extractImageFromArticle(articleHtml: string, baseUrl: string) {
     articleHtml.match(/<img[^>]+data-src="([^"]+)"/i) ||
     articleHtml.match(/<img[^>]+data-lazy-src="([^"]+)"/i) ||
     articleHtml.match(/<img[^>]+src="([^"]+)"/i) ||
-    articleHtml.match(/"image"\s*:\s*"([^"]+)"/i);
+    articleHtml.match(/"image"\s*:\s*"([^"]+)"/i) ||
+    articleHtml.match(/"imageUrl"\s*:\s*"([^"]+)"/i) ||
+    articleHtml.match(/"thumbnail"\s*:\s*"([^"]+)"/i);
 
   if (imageMatch?.[1]) {
     return normalizeImageUrl(imageMatch[1], baseUrl);
@@ -435,12 +474,12 @@ function makeNiceTitleFromUrl(href: string) {
 
   return decodeURIComponent(urlPart)
     .replace(/-/g, " ")
+    .replace(/_/g, " ")
     .replace(/\bpokemon\b/gi, "Pokémon")
     .replace(/\bpokémon\b/gi, "Pokémon")
     .replace(/\bkarten\b/gi, "Karten")
     .replace(/\bsammelkartenspiel\b/gi, "Sammelkartenspiel")
     .replace(/\btcg\b/gi, "TCG")
-    .replace(/\bex\b/gi, "ex")
     .replace(/\bund\b/gi, "&")
     .replace(/\s+/g, " ")
     .trim();
@@ -449,10 +488,12 @@ function makeNiceTitleFromUrl(href: string) {
 function isStrictRetailerPokemonTitle(title: string, href: string) {
   const combined = `${title} ${href}`;
 
-  if (!hasPokemonWord(combined)) return false;
-  if (hasForbiddenCardBrand(combined)) return false;
-
-  return true;
+  return (
+    hasPokemonWord(combined) &&
+    hasStrictCardWord(combined) &&
+    !hasForbiddenCardBrand(combined) &&
+    !hasForbiddenToyWord(combined)
+  );
 }
 
 function extractRetailerDealsFromHtml(
@@ -469,17 +510,17 @@ function extractRetailerDealsFromHtml(
 
     if (!href) continue;
 
-    const hrefLower = href.toLowerCase();
+    const linkText = cleanText(linkMatch[2]);
+    const titleFromUrl = makeNiceTitleFromUrl(href);
+    const preliminaryCandidate = `${href} ${linkText} ${titleFromUrl}`;
 
-    const looksLikeProductUrl =
-      hrefLower.includes("pokemon") ||
-      hrefLower.includes("pok%C3%A9mon".toLowerCase()) ||
-      hrefLower.includes("pok%C3%A9") ||
-      hrefLower.includes("/p/") ||
-      hrefLower.includes("/product/") ||
-      hrefLower.includes("sammelkarten");
-
-    if (!looksLikeProductUrl) continue;
+    /*
+      Ganz wichtig:
+      Händlerseiten werden jetzt bereits vor dem Umfeld-Scan streng geprüft.
+      Wenn Link, Linktext oder URL-Titel nicht nach Pokémon-Karten aussehen,
+      wird der Treffer ignoriert.
+    */
+    if (!isPokemonCardDeal(preliminaryCandidate)) continue;
 
     const sourceUrl = normalizeUrl(href, config.baseUrl);
 
@@ -490,28 +531,29 @@ function extractRetailerDealsFromHtml(
     const surroundingHtml =
       matchIndex >= 0
         ? html.slice(
-            Math.max(0, matchIndex - 3000),
-            Math.min(html.length, matchIndex + 6000),
+            Math.max(0, matchIndex - 2500),
+            Math.min(html.length, matchIndex + 4500),
           )
         : linkMatch[0];
 
-    const linkText = cleanText(linkMatch[2]);
     const surroundingText = cleanText(surroundingHtml);
 
     const titleMatch =
       surroundingHtml.match(/title="([^"]*Pok[^"]+)"/i) ||
       surroundingHtml.match(/alt="([^"]*Pok[^"]+)"/i) ||
       surroundingHtml.match(/aria-label="([^"]*Pok[^"]+)"/i) ||
-      surroundingHtml.match(/"name"\s*:\s*"([^"]*Pok[^"]+)"/i);
+      surroundingHtml.match(/"name"\s*:\s*"([^"]*Pok[^"]+)"/i) ||
+      surroundingHtml.match(/"title"\s*:\s*"([^"]*Pok[^"]+)"/i);
 
     let title = titleMatch?.[1]
       ? cleanText(titleMatch[1])
       : linkText.length >= 10
         ? linkText
-        : makeNiceTitleFromUrl(href);
+        : titleFromUrl;
 
     title = title
       .replace(/\bpokemon\b/gi, "Pokémon")
+      .replace(/\bpokémon\b/gi, "Pokémon")
       .replace(/\bkarten\b/gi, "Karten")
       .replace(/\btcg\b/gi, "TCG")
       .replace(/\s+/g, " ")
@@ -520,25 +562,22 @@ function extractRetailerDealsFromHtml(
     if (!title || title.length < 8) continue;
 
     /*
-      Wichtig:
-      Bei Händlerseiten prüfen wir jetzt streng nur Titel + URL.
-      Dadurch werden Yu-Gi-Oh, One Piece, Lorcana usw. nicht mehr durchgelassen,
-      nur weil irgendwo auf der Sammelkarten-Seite auch Pokémon vorkommt.
+      Finale Prüfung nur mit Titel + Link.
+      Das Umfeld darf den Treffer nicht mehr retten.
+      Dadurch fliegen LEGO, Figuren und normales Spielzeug zuverlässig raus.
     */
     if (!isStrictRetailerPokemonTitle(title, href)) continue;
 
     /*
-      Danach prüfen wir zusätzlich, ob Titel oder Umfeld wie ein Kartenprodukt aussieht.
-      Aber Pokémon muss weiterhin im Titel oder Link stehen.
+      Umfeld darf nur noch für Preis, Bild und Kategorie genutzt werden,
+      nicht mehr für die Entscheidung, ob es ein Pokémon-Kartenprodukt ist.
     */
-    if (!hasCardWord(`${title} ${href} ${surroundingText}`)) continue;
-
     deals.push({
       title: title.length > 180 ? `${title.slice(0, 177)}...` : title,
       source_url: sourceUrl,
       retailer: config.retailer,
       price: extractPrice(surroundingText),
-      category: guessCategory(`${title} ${surroundingText}`),
+      category: guessCategory(`${title} ${href}`),
       deal_type: "Online",
       valid_until: config.validUntil,
       image: extractImageFromArticle(surroundingHtml, config.baseUrl),
@@ -616,33 +655,6 @@ const retailerScanners: RetailerScannerConfig[] = [
       "Automatisch gefundener Pokémon-Karten-Artikel von Rossmann. Bitte Preis und Verfügbarkeit direkt bei Rossmann prüfen.",
   },
   {
-    source: "Netto",
-    retailer: "Netto",
-    url: "https://www.netto-online.de/suche?text=pokemon%20karten",
-    baseUrl: "https://www.netto-online.de",
-    validUntil: "Netto-Fund",
-    description:
-      "Automatisch gefundener Pokémon-Karten-Artikel von Netto. Bitte Preis und Verfügbarkeit direkt bei Netto prüfen.",
-  },
-  {
-    source: "Kaufland",
-    retailer: "Kaufland",
-    url: "https://www.kaufland.de/s/?search_value=pokemon%20karten",
-    baseUrl: "https://www.kaufland.de",
-    validUntil: "Kaufland-Fund",
-    description:
-      "Automatisch gefundener Pokémon-Karten-Artikel von Kaufland. Bitte Preis, Verkäufer und Verfügbarkeit direkt bei Kaufland prüfen.",
-  },
-  {
-    source: "REWE",
-    retailer: "REWE",
-    url: "https://www.rewe.de/suche/produkte?search=pokemon%20karten",
-    baseUrl: "https://www.rewe.de",
-    validUntil: "REWE-Fund",
-    description:
-      "Automatisch gefundener Pokémon-Karten-Artikel von REWE. Bitte Preis und Verfügbarkeit direkt bei REWE prüfen.",
-  },
-  {
     source: "Lidl",
     retailer: "Lidl",
     url: "https://www.lidl.de/q/search?q=pokemon%20karten",
@@ -659,6 +671,87 @@ const retailerScanners: RetailerScannerConfig[] = [
     validUntil: "Aldi-Fund",
     description:
       "Automatisch gefundener Pokémon-Karten-Artikel von Aldi. Bitte Preis und Verfügbarkeit direkt bei Aldi prüfen.",
+  },
+  {
+    source: "Elbenwald",
+    retailer: "Elbenwald",
+    url: "https://www.elbenwald.de/pokemon/sammelkarten",
+    baseUrl: "https://www.elbenwald.de",
+    validUntil: "Elbenwald-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Elbenwald. Bitte Preis und Verfügbarkeit direkt bei Elbenwald prüfen.",
+  },
+  {
+    source: "Thalia",
+    retailer: "Thalia",
+    url: "https://www.thalia.de/kategorie/sammelkarten-34316/",
+    baseUrl: "https://www.thalia.de",
+    validUntil: "Thalia-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Thalia. Bitte Preis und Verfügbarkeit direkt bei Thalia prüfen.",
+  },
+  {
+    source: "LottiCards",
+    retailer: "LottiCards",
+    url: "https://www.lotticards.de/pokemon-sammelkarten",
+    baseUrl: "https://www.lotticards.de",
+    validUntil: "LottiCards-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von LottiCards. Bitte Preis und Verfügbarkeit direkt bei LottiCards prüfen.",
+  },
+  {
+    source: "God of Cards",
+    retailer: "God of Cards",
+    url: "https://godofcards.com/en-nl/collections/pokemon-cards",
+    baseUrl: "https://godofcards.com",
+    validUntil: "God-of-Cards-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von God of Cards. Bitte Preis und Verfügbarkeit direkt bei God of Cards prüfen.",
+  },
+  {
+    source: "Gate to the Games",
+    retailer: "Gate to the Games",
+    url: "https://www.gate-to-the-games.de/",
+    baseUrl: "https://www.gate-to-the-games.de",
+    validUntil: "Gate-to-the-Games-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Gate to the Games. Bitte Preis und Verfügbarkeit direkt bei Gate to the Games prüfen.",
+  },
+  {
+    source: "FantasyWelt",
+    retailer: "FantasyWelt",
+    url: "https://www.fantasywelt.de/Pokemon-DEEN_1",
+    baseUrl: "https://www.fantasywelt.de",
+    validUntil: "FantasyWelt-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von FantasyWelt. Bitte Preis und Verfügbarkeit direkt bei FantasyWelt prüfen.",
+  },
+  {
+    source: "Toynova",
+    retailer: "Toynova",
+    url: "https://www.toynova.de/pokemon",
+    baseUrl: "https://www.toynova.de",
+    validUntil: "Toynova-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Toynova. Bitte Preis und Verfügbarkeit direkt bei Toynova prüfen.",
+  },
+  {
+    source: "Coolshop",
+    retailer: "Coolshop",
+    url: "https://www.coolshop.nl/s/merk%3Dpokemon%2Cpokemon/",
+    baseUrl: "https://www.coolshop.nl",
+    validUntil: "Coolshop-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Coolshop. Bitte Preis und Verfügbarkeit direkt bei Coolshop prüfen.",
+  },
+  {
+    source: "Otto",
+    retailer: "Otto",
+    url: "https://www.otto.de/spielzeug/spiele/sammelkarten/?marke=_pokemon",
+    baseUrl: "https://www.otto.de",
+    validUntil: "Otto-Fund",
+    description:
+      "Automatisch gefundener Pokémon-Karten-Artikel von Otto. Bitte Preis, Verkäufer und Verfügbarkeit direkt bei Otto prüfen.",
   },
 ];
 

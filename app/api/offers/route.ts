@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../../lib/supabase-admin";
 
+function isAllowed(request: Request) {
+  const adminPin = request.headers.get("x-admin-pin");
+  return adminPin && adminPin === process.env.NEXT_PUBLIC_ADMIN_PIN;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const adminPin = request.headers.get("x-admin-pin");
-
-    if (!adminPin || adminPin !== process.env.NEXT_PUBLIC_ADMIN_PIN) {
+    if (!isAllowed(request)) {
       return NextResponse.json(
         { error: "Nicht erlaubt. PIN stimmt nicht." },
         { status: 401 },
@@ -26,14 +29,7 @@ export async function POST(request: Request) {
       description,
     } = body;
 
-    if (
-      !title ||
-      !retailer ||
-      !price ||
-      !category ||
-      !valid_until ||
-      !deal_type
-    ) {
+    if (!title || !retailer || !price || !category || !valid_until || !deal_type) {
       return NextResponse.json(
         { error: "Pflichtfelder fehlen." },
         { status: 400 },
@@ -63,8 +59,6 @@ export async function POST(request: Request) {
       .select();
 
     if (error) {
-      console.error("Supabase Insert Error:", error);
-
       return NextResponse.json(
         {
           error: error.message,
@@ -78,16 +72,32 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("API Route Error:", error);
-
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "Unbekannter Serverfehler.",
+          error instanceof Error ? error.message : "Unbekannter Serverfehler.",
       },
       { status: 500 },
     );
   }
+}
+
+export async function DELETE(request: Request) {
+  if (!isAllowed(request)) {
+    return NextResponse.json({ error: "Nicht erlaubt." }, { status: 401 });
+  }
+
+  const { error } = await supabaseAdmin
+    .from("offers")
+    .delete()
+    .gte("id", 0);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: "Alle Angebote wurden gelöscht.",
+  });
 }
