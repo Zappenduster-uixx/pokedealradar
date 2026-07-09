@@ -130,13 +130,10 @@ function detectRetailer(text: string) {
     { name: "Lidl", keywords: ["lidl"] },
     { name: "Aldi", keywords: ["aldi"] },
     { name: "Elbenwald", keywords: ["elbenwald"] },
-    { name: "Thalia", keywords: ["thalia"] },
     { name: "LottiCards", keywords: ["lotticards", "lotti cards"] },
     { name: "God of Cards", keywords: ["godofcards", "god of cards"] },
     { name: "Gate to the Games", keywords: ["gate to the games", "gttg"] },
-    { name: "FantasyWelt", keywords: ["fantasywelt", "fantasy welt"] },
     { name: "Toynova", keywords: ["toynova"] },
-    { name: "Coolshop", keywords: ["coolshop"] },
     { name: "Otto", keywords: ["otto.de", " otto "] },
     { name: "GameStop", keywords: ["gamestop", "game stop"] },
     { name: "eBay", keywords: ["ebay"] },
@@ -178,8 +175,7 @@ function hasPokemonWord(text: string) {
     lower.includes("pokemon") ||
     lower.includes("pokémon") ||
     lower.includes("pokmon") ||
-    lower.includes("pok%c3%a9mon") ||
-    lower.includes("pok%C3%A9mon".toLowerCase())
+    lower.includes("pok%c3%a9mon")
   );
 }
 
@@ -269,7 +265,6 @@ function hasStrictCardWord(text: string) {
     "pokémon karten",
     "pokemon-karte",
     "pokémon-karte",
-    "pokemon sammlekarten",
     "pokemon sammelkarten",
     "pokémon sammelkarten",
     "sammelkarten",
@@ -514,12 +509,6 @@ function extractRetailerDealsFromHtml(
     const titleFromUrl = makeNiceTitleFromUrl(href);
     const preliminaryCandidate = `${href} ${linkText} ${titleFromUrl}`;
 
-    /*
-      Ganz wichtig:
-      Händlerseiten werden jetzt bereits vor dem Umfeld-Scan streng geprüft.
-      Wenn Link, Linktext oder URL-Titel nicht nach Pokémon-Karten aussehen,
-      wird der Treffer ignoriert.
-    */
     if (!isPokemonCardDeal(preliminaryCandidate)) continue;
 
     const sourceUrl = normalizeUrl(href, config.baseUrl);
@@ -560,18 +549,8 @@ function extractRetailerDealsFromHtml(
       .trim();
 
     if (!title || title.length < 8) continue;
-
-    /*
-      Finale Prüfung nur mit Titel + Link.
-      Das Umfeld darf den Treffer nicht mehr retten.
-      Dadurch fliegen LEGO, Figuren und normales Spielzeug zuverlässig raus.
-    */
     if (!isStrictRetailerPokemonTitle(title, href)) continue;
 
-    /*
-      Umfeld darf nur noch für Preis, Bild und Kategorie genutzt werden,
-      nicht mehr für die Entscheidung, ob es ein Pokémon-Kartenprodukt ist.
-    */
     deals.push({
       title: title.length > 180 ? `${title.slice(0, 177)}...` : title,
       source_url: sourceUrl,
@@ -682,15 +661,6 @@ const retailerScanners: RetailerScannerConfig[] = [
       "Automatisch gefundener Pokémon-Karten-Artikel von Elbenwald. Bitte Preis und Verfügbarkeit direkt bei Elbenwald prüfen.",
   },
   {
-    source: "Thalia",
-    retailer: "Thalia",
-    url: "https://www.thalia.de/kategorie/sammelkarten-34316/",
-    baseUrl: "https://www.thalia.de",
-    validUntil: "Thalia-Fund",
-    description:
-      "Automatisch gefundener Pokémon-Karten-Artikel von Thalia. Bitte Preis und Verfügbarkeit direkt bei Thalia prüfen.",
-  },
-  {
     source: "LottiCards",
     retailer: "LottiCards",
     url: "https://www.lotticards.de/pokemon-sammelkarten",
@@ -711,20 +681,11 @@ const retailerScanners: RetailerScannerConfig[] = [
   {
     source: "Gate to the Games",
     retailer: "Gate to the Games",
-    url: "https://www.gate-to-the-games.de/",
+    url: "https://www.gate-to-the-games.de/Pokemon-Karten/",
     baseUrl: "https://www.gate-to-the-games.de",
     validUntil: "Gate-to-the-Games-Fund",
     description:
       "Automatisch gefundener Pokémon-Karten-Artikel von Gate to the Games. Bitte Preis und Verfügbarkeit direkt bei Gate to the Games prüfen.",
-  },
-  {
-    source: "FantasyWelt",
-    retailer: "FantasyWelt",
-    url: "https://www.fantasywelt.de/Pokemon-DEEN_1",
-    baseUrl: "https://www.fantasywelt.de",
-    validUntil: "FantasyWelt-Fund",
-    description:
-      "Automatisch gefundener Pokémon-Karten-Artikel von FantasyWelt. Bitte Preis und Verfügbarkeit direkt bei FantasyWelt prüfen.",
   },
   {
     source: "Toynova",
@@ -734,15 +695,6 @@ const retailerScanners: RetailerScannerConfig[] = [
     validUntil: "Toynova-Fund",
     description:
       "Automatisch gefundener Pokémon-Karten-Artikel von Toynova. Bitte Preis und Verfügbarkeit direkt bei Toynova prüfen.",
-  },
-  {
-    source: "Coolshop",
-    retailer: "Coolshop",
-    url: "https://www.coolshop.nl/s/merk%3Dpokemon%2Cpokemon/",
-    baseUrl: "https://www.coolshop.nl",
-    validUntil: "Coolshop-Fund",
-    description:
-      "Automatisch gefundener Pokémon-Karten-Artikel von Coolshop. Bitte Preis und Verfügbarkeit direkt bei Coolshop prüfen.",
   },
   {
     source: "Otto",
