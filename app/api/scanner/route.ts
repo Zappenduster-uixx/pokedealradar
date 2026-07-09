@@ -13,6 +13,9 @@ type ScannerDeal = {
   description: string;
 };
 
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1613771404721-1f92d799e49f?q=80&w=1200&auto=format&fit=crop";
+
 function isAllowed(request: Request) {
   const adminPin = request.headers.get("x-admin-pin");
   return adminPin && adminPin === process.env.NEXT_PUBLIC_ADMIN_PIN;
@@ -35,6 +38,7 @@ function guessCategory(text: string) {
   const lower = text.toLowerCase();
 
   if (lower.includes("display")) return "Displays";
+
   if (
     lower.includes("top-trainer") ||
     lower.includes("top trainer") ||
@@ -44,7 +48,9 @@ function guessCategory(text: string) {
   ) {
     return "ETB";
   }
+
   if (lower.includes("tin")) return "Tins";
+
   if (
     lower.includes("kollektion") ||
     lower.includes("collection") ||
@@ -127,6 +133,54 @@ function normalizeMyDealzUrl(href: string) {
   return `https://www.mydealz.de${href}`.split("?")[0];
 }
 
+function normalizeImageUrl(url: string) {
+  if (!url) return FALLBACK_IMAGE;
+
+  const cleanedUrl = url
+    .replace(/&amp;/g, "&")
+    .trim()
+    .split(" ")[0];
+
+  if (cleanedUrl.startsWith("//")) {
+    return `https:${cleanedUrl}`;
+  }
+
+  if (cleanedUrl.startsWith("http")) {
+    return cleanedUrl;
+  }
+
+  if (cleanedUrl.startsWith("/")) {
+    return `https://www.mydealz.de${cleanedUrl}`;
+  }
+
+  return FALLBACK_IMAGE;
+}
+
+function extractImageFromArticle(articleHtml: string) {
+  const srcSetMatch =
+    articleHtml.match(/<source[^>]+srcset="([^"]+)"/i) ||
+    articleHtml.match(/<img[^>]+srcset="([^"]+)"/i);
+
+  if (srcSetMatch?.[1]) {
+    const firstSrcSetUrl = srcSetMatch[1].split(",")[0]?.trim().split(" ")[0];
+
+    if (firstSrcSetUrl) {
+      return normalizeImageUrl(firstSrcSetUrl);
+    }
+  }
+
+  const imageMatch =
+    articleHtml.match(/<img[^>]+data-src="([^"]+)"/i) ||
+    articleHtml.match(/<img[^>]+data-lazy-src="([^"]+)"/i) ||
+    articleHtml.match(/<img[^>]+src="([^"]+)"/i);
+
+  if (imageMatch?.[1]) {
+    return normalizeImageUrl(imageMatch[1]);
+  }
+
+  return FALLBACK_IMAGE;
+}
+
 function extractDealsFromHtml(html: string): ScannerDeal[] {
   const deals: ScannerDeal[] = [];
 
@@ -175,8 +229,7 @@ function extractDealsFromHtml(html: string): ScannerDeal[] {
       category: guessCategory(articleText),
       deal_type: "Online",
       valid_until: "MyDealz-Fund",
-      image:
-        "https://images.unsplash.com/photo-1613771404721-1f92d799e49f?q=80&w=1200&auto=format&fit=crop",
+      image: extractImageFromArticle(articleHtml),
       description:
         "Automatisch gefundener Pokémon-Karten-Deal aus der MyDealz-Pokémon-Gruppe. Bitte Preis, Händler und Verfügbarkeit auf MyDealz prüfen.",
     });
