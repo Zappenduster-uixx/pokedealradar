@@ -29,9 +29,13 @@ export default function ProspectAdminPage() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [message, setMessage] = useState("");
+  const [rawError, setRawError] = useState("");
   const [results, setResults] = useState<ProspectSourceResult[]>([]);
 
   function unlock() {
+    setMessage("");
+    setRawError("");
+
     if (!pin.trim()) {
       setMessage("Bitte Admin-PIN eingeben.");
       return;
@@ -60,6 +64,7 @@ export default function ProspectAdminPage() {
 
     setIsScanning(true);
     setMessage("Prospekte werden gescannt...");
+    setRawError("");
     setResults([]);
 
     try {
@@ -71,7 +76,20 @@ export default function ProspectAdminPage() {
         },
       });
 
-      const data = (await response.json()) as ProspectScannerResponse;
+      const contentType = response.headers.get("content-type") || "";
+      const responseText = await response.text();
+
+      if (!contentType.includes("application/json")) {
+        setMessage(
+          `Die API hat keine JSON-Antwort geliefert. Status: ${response.status} ${response.statusText}`,
+        );
+
+        setRawError(responseText.slice(0, 2000));
+        setIsScanning(false);
+        return;
+      }
+
+      const data = JSON.parse(responseText) as ProspectScannerResponse;
 
       if (!response.ok) {
         setMessage(data.error || "Fehler beim Prospekt-Scan.");
@@ -119,9 +137,9 @@ export default function ProspectAdminPage() {
             </h1>
 
             <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">
-              Scannt automatisch öffentliche Prospektseiten von Supermärkten und
-              sucht nach Pokémon-Karten, Boostern, TCG-Produkten und
-              Sammelkarten-Angeboten.
+              Scannt automatisch öffentliche Prospektseiten, Angebotsbereiche,
+              digitale Prospektdaten und PDF-Prospekte nach Pokémon-Karten,
+              Boostern und Sammelkarten-Angeboten.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -130,7 +148,7 @@ export default function ProspectAdminPage() {
               </span>
 
               <span className="poke-badge poke-badge-dark">
-                Supermarkt-Prospekte
+                Digitale Prospekte
               </span>
 
               <span className="poke-badge poke-badge-dark">
@@ -208,6 +226,25 @@ export default function ProspectAdminPage() {
               <p className="mt-3 whitespace-pre-line text-sm leading-7 text-zinc-300">
                 {message}
               </p>
+            </div>
+          </section>
+        )}
+
+        {rawError && (
+          <section className="poke-panel mb-8 p-6">
+            <div className="relative z-10">
+              <h2 className="font-poke text-2xl text-red-300">
+                Rohantwort der API
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-zinc-400">
+                Das hilft uns zu sehen, ob Vercel eine 404-, 500- oder
+                Fehlerseite zurückgibt.
+              </p>
+
+              <pre className="mt-4 max-h-[420px] overflow-auto rounded-2xl border border-red-500/20 bg-black/60 p-4 text-xs leading-6 text-red-200">
+                {rawError}
+              </pre>
             </div>
           </section>
         )}
