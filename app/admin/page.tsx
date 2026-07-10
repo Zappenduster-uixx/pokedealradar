@@ -1,12 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function AdminPage() {
   const [pin, setPin] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [message, setMessage] = useState("");
+
+  const [scannerLoading, setScannerLoading] = useState(false);
+  const [scannerProgress, setScannerProgress] = useState(0);
+  const [scannerElapsedSeconds, setScannerElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!scannerLoading) return;
+
+    setScannerProgress(5);
+    setScannerElapsedSeconds(0);
+
+    const startedAt = Date.now();
+
+    const interval = window.setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setScannerElapsedSeconds(elapsed);
+
+      setScannerProgress((currentProgress) => {
+        if (currentProgress < 40) return currentProgress + 5;
+        if (currentProgress < 70) return currentProgress + 3;
+        if (currentProgress < 88) return currentProgress + 1.5;
+        if (currentProgress < 95) return currentProgress + 0.5;
+        return currentProgress;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [scannerLoading]);
 
   function unlockAdmin() {
     if (!pin.trim()) {
@@ -39,7 +69,10 @@ export default function AdminPage() {
 
     if (!confirmed) return;
 
-    setMessage("Scanner läuft...");
+    setScannerLoading(true);
+    setScannerProgress(5);
+    setScannerElapsedSeconds(0);
+    setMessage("Angebots-Scanner läuft...");
 
     try {
       const response = await fetch("/api/scanner", {
@@ -53,18 +86,24 @@ export default function AdminPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        setScannerProgress(100);
         setMessage(data.error || "Fehler beim Scanner.");
+        setScannerLoading(false);
         return;
       }
 
+      setScannerProgress(100);
       setMessage(data.message || "Scanner fertig.");
     } catch (error) {
+      setScannerProgress(100);
       setMessage(
         error instanceof Error
           ? error.message
           : "Unbekannter Fehler beim Scanner.",
       );
     }
+
+    setScannerLoading(false);
   }
 
   async function deleteAllOffers() {
@@ -110,6 +149,28 @@ export default function AdminPage() {
           : "Unbekannter Fehler beim Löschen.",
       );
     }
+  }
+
+  function getScannerText() {
+    if (!scannerLoading) return "";
+
+    if (scannerProgress < 30) {
+      return "Scanner wird gestartet und Quellen werden vorbereitet...";
+    }
+
+    if (scannerProgress < 60) {
+      return "Shops und Deal-Seiten werden durchsucht...";
+    }
+
+    if (scannerProgress < 85) {
+      return "Gefundene Angebote werden geprüft...";
+    }
+
+    if (scannerProgress < 95) {
+      return "Neue Deals werden in Supabase gespeichert...";
+    }
+
+    return "Fast fertig...";
   }
 
   if (!isUnlocked) {
@@ -212,6 +273,44 @@ export default function AdminPage() {
           </section>
         )}
 
+        {(scannerLoading || scannerProgress > 0) && (
+          <section className="poke-panel mb-8 p-6">
+            <div className="relative z-10">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="font-poke text-2xl text-yellow-400">
+                    Angebots-Scanner Fortschritt
+                  </h2>
+
+                  <p className="mt-2 text-sm text-zinc-400">
+                    {scannerLoading
+                      ? getScannerText()
+                      : scannerProgress === 100
+                        ? "Scan abgeschlossen."
+                        : "Bereit."}
+                  </p>
+                </div>
+
+                <div className="text-sm font-bold text-zinc-300">
+                  {Math.round(scannerProgress)} % · {scannerElapsedSeconds}s
+                </div>
+              </div>
+
+              <div className="mt-5 h-4 overflow-hidden rounded-full border border-white/10 bg-black/50">
+                <div
+                  className="h-full rounded-full bg-yellow-400 transition-all duration-500"
+                  style={{ width: `${Math.min(scannerProgress, 100)}%` }}
+                />
+              </div>
+
+              <p className="mt-3 text-xs leading-5 text-zinc-500">
+                Hinweis: Die Prozentanzeige ist geschätzt. Der Scanner meldet
+                echte Ergebnisse erst nach Abschluss der API-Anfrage zurück.
+              </p>
+            </div>
+          </section>
+        )}
+
         <section className="poke-panel p-6">
           <div className="relative z-10">
             <h2 className="font-poke text-2xl text-yellow-400">
@@ -227,9 +326,10 @@ export default function AdminPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 onClick={startScanner}
-                className="poke-button poke-button-primary px-5 py-4"
+                disabled={scannerLoading}
+                className="poke-button poke-button-primary px-5 py-4 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Scanner starten
+                {scannerLoading ? "Scanner läuft..." : "Scanner starten"}
               </button>
 
               <Link

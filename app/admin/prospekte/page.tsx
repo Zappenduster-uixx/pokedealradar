@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type ProspectSourceResult = {
@@ -28,9 +28,37 @@ export default function ProspectAdminPage() {
   const [pin, setPin] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [message, setMessage] = useState("");
   const [rawError, setRawError] = useState("");
   const [results, setResults] = useState<ProspectSourceResult[]>([]);
+
+  useEffect(() => {
+    if (!isScanning) return;
+
+    setProgress(3);
+    setElapsedSeconds(0);
+
+    const startedAt = Date.now();
+
+    const interval = window.setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setElapsedSeconds(elapsed);
+
+      setProgress((currentProgress) => {
+        if (currentProgress < 30) return currentProgress + 3;
+        if (currentProgress < 60) return currentProgress + 2;
+        if (currentProgress < 85) return currentProgress + 1;
+        if (currentProgress < 94) return currentProgress + 0.5;
+        return currentProgress;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isScanning]);
 
   function unlock() {
     setMessage("");
@@ -63,6 +91,8 @@ export default function ProspectAdminPage() {
     if (!confirmed) return;
 
     setIsScanning(true);
+    setProgress(3);
+    setElapsedSeconds(0);
     setMessage("Prospekte werden gescannt...");
     setRawError("");
     setResults([]);
@@ -80,6 +110,7 @@ export default function ProspectAdminPage() {
       const responseText = await response.text();
 
       if (!contentType.includes("application/json")) {
+        setProgress(100);
         setMessage(
           `Die API hat keine JSON-Antwort geliefert. Status: ${response.status} ${response.statusText}`,
         );
@@ -92,14 +123,17 @@ export default function ProspectAdminPage() {
       const data = JSON.parse(responseText) as ProspectScannerResponse;
 
       if (!response.ok) {
+        setProgress(100);
         setMessage(data.error || "Fehler beim Prospekt-Scan.");
         setIsScanning(false);
         return;
       }
 
+      setProgress(100);
       setMessage(data.message || "Prospekt-Scanner fertig.");
       setResults(data.sources || []);
     } catch (error) {
+      setProgress(100);
       setMessage(
         error instanceof Error
           ? error.message
@@ -108,6 +142,28 @@ export default function ProspectAdminPage() {
     }
 
     setIsScanning(false);
+  }
+
+  function getEstimatedText() {
+    if (!isScanning) return "";
+
+    if (progress < 25) {
+      return "Starte Scanner und prüfe Prospektquellen...";
+    }
+
+    if (progress < 55) {
+      return "Prospektseiten werden geladen und Links werden gesucht...";
+    }
+
+    if (progress < 80) {
+      return "Digitale Prospekte, Angebotsseiten und PDFs werden durchsucht...";
+    }
+
+    if (progress < 95) {
+      return "Treffer werden geprüft und vorbereitet...";
+    }
+
+    return "Fast fertig...";
   }
 
   return (
@@ -217,6 +273,45 @@ export default function ProspectAdminPage() {
             )}
           </div>
         </section>
+
+        {(isScanning || progress > 0) && (
+          <section className="poke-panel mb-8 p-6">
+            <div className="relative z-10">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="font-poke text-2xl text-yellow-400">
+                    Scan-Fortschritt
+                  </h2>
+
+                  <p className="mt-2 text-sm text-zinc-400">
+                    {isScanning
+                      ? getEstimatedText()
+                      : progress === 100
+                        ? "Scan abgeschlossen."
+                        : "Bereit."}
+                  </p>
+                </div>
+
+                <div className="text-sm font-bold text-zinc-300">
+                  {Math.round(progress)} % · {elapsedSeconds}s
+                </div>
+              </div>
+
+              <div className="mt-5 h-4 overflow-hidden rounded-full border border-white/10 bg-black/50">
+                <div
+                  className="h-full rounded-full bg-yellow-400 transition-all duration-500"
+                  style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+              </div>
+
+              <p className="mt-3 text-xs leading-5 text-zinc-500">
+                Hinweis: Die Prozentanzeige ist eine geschätzte Ladeanzeige. Die
+                echte Antwort kommt vom Scanner erst, wenn alle Quellen
+                abgeschlossen oder abgebrochen wurden.
+              </p>
+            </div>
+          </section>
+        )}
 
         {message && (
           <section className="poke-panel mb-8 p-6">

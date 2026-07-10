@@ -38,6 +38,11 @@ type ProspectScanResult = {
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1613771404721-1f92d799e49f?q=80&w=1200&auto=format&fit=crop";
 
+const FETCH_TIMEOUT_MS = 10000;
+const PDF_TIMEOUT_MS = 15000;
+const MAX_LINKS_PER_SOURCE = 6;
+const MAX_DEEP_LINKS_PER_PAGE = 3;
+
 const prospectSources: ProspectSource[] = [
   {
     source: "Aldi Süd Prospekt",
@@ -146,6 +151,16 @@ const prospectSources: ProspectSource[] = [
 function isAllowed(request: Request) {
   const adminPin = request.headers.get("x-admin-pin");
   return adminPin && adminPin === process.env.NEXT_PUBLIC_ADMIN_PIN;
+}
+
+function createTimeoutController(timeoutMs: number) {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  return { controller, timeout };
 }
 
 function decodeEscapedText(value: string) {
@@ -410,48 +425,63 @@ function buildDealFromText(
 }
 
 async function fetchHtml(url: string) {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
-    },
-    cache: "no-store",
-  });
+  const { controller, timeout } = createTimeoutController(FETCH_TIMEOUT_MS);
 
-  if (!response.ok) {
-    throw new Error(`Status: ${response.status}`);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+      },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Status: ${response.status}`);
+    }
+
+    return response.text();
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return response.text();
 }
 
 async function fetchPdfText(url: string) {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-      Accept: "application/pdf,*/*",
-      "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`PDF Status: ${response.status}`);
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-
-  const parser = new PDFParse({ data: buffer });
+  const { controller, timeout } = createTimeoutController(PDF_TIMEOUT_MS);
 
   try {
-    const parsedPdf = await parser.getText();
-    return parsedPdf.text || "";
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        Accept: "application/pdf,*/*",
+        "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+      },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`PDF Status: ${response.status}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const parser = new PDFParse({ data: buffer });
+
+    try {
+      const parsedPdf = await parser.getText();
+      return parsedPdf.text || "";
+    } finally {
+      await parser.destroy();
+    }
   } finally {
-    await parser.destroy();
+    clearTimeout(timeout);
   }
 }
 
@@ -640,7 +670,7 @@ async function scanProspectSource(
 
     const prospectLinks = startLinks
       .filter((link) => isProspectRelatedLink(link) || isPdfLink(link))
-      .slice(0, 25);
+      .slice(0, MAX_LINKS_PER_SOURCE);
 
     for (const link of prospectLinks) {
       urlsToScan.add(link);
@@ -669,7 +699,7 @@ async function scanProspectSource(
 
           const deeperLinks = pageLinks
             .filter((link) => isProspectRelatedLink(link) || isPdfLink(link))
-            .slice(0, 10);
+            .slice(0, MAX_DEEP_LINKS_PER_PAGE);
 
           for (const deeperUrl of deeperLinks) {
             try {
@@ -719,9 +749,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Nicht erlaubt." }, { status: 401 });
   }
 
-  const results = await Promise.all(
-    prospectSources.map((source) => scanProspectSource(source)),
-  );
+  const results: ProspectScanResult[] = [];
+
+  for (const source of prospectSources) {
+    const result = await scanProspectSource(source);
+    results.push(result);
+  }
 
   const totalFound = results.reduce((sum, result) => sum + result.found, 0);
   const totalInserted = results.reduce((sum, result) => sum + result.inserted, 0);
