@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PDFParse } from "pdf-parse";
 import { supabaseAdmin } from "../../../lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -444,12 +445,14 @@ async function fetchPdfText(url: string) {
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  const pdfParseModule = await import("pdf-parse");
-  const pdfParse = pdfParseModule.default;
+  const parser = new PDFParse({ data: buffer });
 
-  const parsedPdf = await pdfParse(buffer);
-
-  return parsedPdf.text || "";
+  try {
+    const parsedPdf = await parser.getText();
+    return parsedPdf.text || "";
+  } finally {
+    await parser.destroy();
+  }
 }
 
 function extractLinks(html: string, baseUrl: string) {
